@@ -21,7 +21,7 @@ export default function Home() {
     e.preventDefault();
     if (!window.confirm("Delete this entry?")) return;
     try {
-      await axios.delete(`https://zenith-journal.onrender.com`);
+      await axios.delete(`https://zenith-journal.onrender.com/entries`);
       setEntries(prev => prev.filter(entry => entry.id !== id));
     } catch (err) {
       console.error("Delete failed:", err.response?.data || err.message);

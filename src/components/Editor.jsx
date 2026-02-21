@@ -52,7 +52,7 @@ export default function Editor({
 
   const runAIAnalysis = async (text) => {
     try {
-      const response = await axios.post("https://zenith-journal.onrender.com", { text });
+      const response = await axios.post("https://zenith-journal.onrender.com/analyze", { text });
       if (response.data && response.data.distortion) {
         setSidePanelData(response.data);
       }
@@ -66,7 +66,7 @@ export default function Editor({
   const handleSave = async () => {
     if (!journalText.trim()) return;
     try {
-      await axios.post("https://zenith-journal.onrender.com", {
+      await axios.post("https://zenith-journal.onrender.com/save", {
         title: title.trim() || "Untitled",
         text: journalText,
         intensity_score: intensityScore,
