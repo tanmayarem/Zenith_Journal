@@ -1,122 +1,64 @@
-import sqlite3
+from pymongo import MongoClient
 from datetime import datetime
+from dotenv import load_dotenv
+import os
 
-DB_PATH = "journal.db"
+load_dotenv()
 
-def init_db():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
+client = MongoClient(os.getenv("MONGO_URI"))
+db = client["zenith_journal"]
 
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS entries (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT,
-            text TEXT NOT NULL,
-            distortion TEXT,
-            intensity_score INTEGER,
-            created_at TEXT
-        )
-    """)
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS fingerprint (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            distortion TEXT NOT NULL,
-            day_of_week TEXT,
-            hour_of_day INTEGER,
-            entry_length INTEGER,
-            created_at TEXT
-        )
-    """)
-
-    # Add title column if it doesn't exist yet (for existing databases)
-    try:
-        cursor.execute("ALTER TABLE entries ADD COLUMN title TEXT")
-    except:
-        pass
-
-    conn.commit()
-    conn.close()
+entries_col = db["entries"]
+fingerprint_col = db["fingerprint"]
 
 def save_entry(title, text, distortion=None, intensity_score=0):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
     now = datetime.now().isoformat()
-
-    cursor.execute("""
-        INSERT INTO entries (title, text, distortion, intensity_score, created_at)
-        VALUES (?, ?, ?, ?, ?)
-    """, (title, text, distortion, intensity_score, now))
+    entry = {
+        "title": title,
+        "text": text,
+        "distortion": distortion,
+        "intensity_score": intensity_score,
+        "created_at": now,
+    }
+    entries_col.insert_one(entry)
 
     if distortion:
-        day = datetime.now().strftime("%A")
-        hour = datetime.now().hour
-        length = len(text)
-        cursor.execute("""
-            INSERT INTO fingerprint (distortion, day_of_week, hour_of_day, entry_length, created_at)
-            VALUES (?, ?, ?, ?, ?)
-        """, (distortion, day, hour, length, now))
-
-    conn.commit()
-    conn.close()
+        fingerprint_col.insert_one({
+            "distortion": distortion,
+            "day_of_week": datetime.now().strftime("%A"),
+            "hour_of_day": datetime.now().hour,
+            "entry_length": len(text),
+            "created_at": now,
+        })
 
 def delete_entry(entry_id):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM entries WHERE id = ?", (entry_id,))
-    conn.commit()
-    conn.close()
+    from bson import ObjectId
+    entries_col.delete_one({"_id": ObjectId(entry_id)})
 
 def get_all_entries():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, title, text, distortion, intensity_score, created_at FROM entries ORDER BY created_at DESC")
-    rows = cursor.fetchall()
-    conn.close()
+    entries = entries_col.find().sort("created_at", -1)
     return [
         {
-            "id": r[0],
-            "title": r[1] or "Untitled",
-            "text": r[2],
-            "distortion": r[3],
-            "intensity_score": r[4],
-            "created_at": r[5],
+            "id": str(e["_id"]),
+            "title": e.get("title", "Untitled"),
+            "text": e.get("text", ""),
+            "distortion": e.get("distortion"),
+            "intensity_score": e.get("intensity_score", 0),
+            "created_at": e.get("created_at", ""),
         }
-        for r in rows
+        for e in entries
     ]
 
 def get_fingerprint():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
+    from collections import Counter
+    docs = list(fingerprint_col.find())
 
-    cursor.execute("""
-        SELECT distortion, COUNT(*) as count
-        FROM fingerprint
-        GROUP BY distortion
-        ORDER BY count DESC
-    """)
-    distortions = [{"distortion": r[0], "count": r[1]} for r in cursor.fetchall()]
+    distortion_counts = Counter(d["distortion"] for d in docs)
+    day_counts = Counter(d["day_of_week"] for d in docs)
+    hour_counts = Counter(d["hour_of_day"] for d in docs)
 
-    cursor.execute("""
-        SELECT day_of_week, COUNT(*) as count
-        FROM fingerprint
-        GROUP BY day_of_week
-        ORDER BY count DESC
-    """)
-    days = [{"day": r[0], "count": r[1]} for r in cursor.fetchall()]
-
-    cursor.execute("""
-        SELECT hour_of_day, COUNT(*) as count
-        FROM fingerprint
-        GROUP BY hour_of_day
-        ORDER BY count DESC
-        LIMIT 3
-    """)
-    hours = [{"hour": r[0], "count": r[1]} for r in cursor.fetchall()]
-
-    conn.close()
     return {
-        "top_distortions": distortions,
-        "spiral_days": days,
-        "spiral_hours": hours,
+        "top_distortions": [{"distortion": k, "count": v} for k, v in distortion_counts.most_common()],
+        "spiral_days": [{"day": k, "count": v} for k, v in day_counts.most_common()],
+        "spiral_hours": [{"hour": k, "count": v} for k, v in hour_counts.most_common(3)],
     }

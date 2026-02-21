@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from groq import Groq
 from dotenv import load_dotenv
-from database import init_db, save_entry, delete_entry, get_all_entries, get_fingerprint
+from database import save_entry, delete_entry, get_all_entries, get_fingerprint
 import os
 
 load_dotenv()
@@ -20,8 +20,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize database on startup
-init_db()
+
 
 class JournalText(BaseModel):
     text: str
@@ -43,7 +42,7 @@ async def save(request: SaveRequest):
     return {"status": "saved"}
 
 @app.delete("/entries/{entry_id}")
-async def delete(entry_id: int):
+async def delete(entry_id: str):
     delete_entry(entry_id)
     return {"status": "deleted"}
 
