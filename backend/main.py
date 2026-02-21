@@ -14,7 +14,7 @@ client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 # Allow React frontend to talk to this server
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "https://journal-flame-iota.vercel.app"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -101,16 +101,6 @@ Journal entry:
             result["reframe"] = line.replace("REFRAME:", "").strip()
 
     return result if "distortion" in result else {"distortion": None}
-
-
-@app.post("/save")
-async def save(request: SaveRequest):
-    save_entry(
-        text=request.text,
-        distortion=request.distortion,
-        intensity_score=request.intensity_score,
-    )
-    return {"status": "saved"}
 
 
 @app.get("/entries")
