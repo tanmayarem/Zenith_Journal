@@ -14,7 +14,7 @@ client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 # Allow React frontend to talk to this server
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["http://localhost:5173", "https://journal-flame-iota.vercel.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
