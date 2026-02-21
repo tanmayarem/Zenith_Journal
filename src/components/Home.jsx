@@ -7,7 +7,7 @@ export default function Home() {
   const navigate = useNavigate();
 
   const fetchEntries = () => {
-    axios.get("https://zenith-journal.onrender.com")
+    axios.get("https://zenith-journal.onrender.com/entries")
       .then(res => setEntries(res.data))
       .catch(err => console.error(err));
   };
@@ -21,7 +21,7 @@ export default function Home() {
     e.preventDefault();
     if (!window.confirm("Delete this entry?")) return;
     try {
-      await axios.delete(`https://zenith-journal.onrender.com/entries`);
+      await axios.delete(`https://zenith-journal.onrender.com/entries/${id}`);
       setEntries(prev => prev.filter(entry => entry.id !== id));
     } catch (err) {
       console.error("Delete failed:", err.response?.data || err.message);
